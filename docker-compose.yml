@@ -1,0 +1,95 @@
+services:
+  nginx:
+    image: nginx:1.21-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+    networks:
+      - krakend
+
+  krakend:
+    image: devopsfaith/krakend:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./krakend:/etc/krakend
+    command: ["run", "-d", "-c", "/etc/krakend/krakend.json"]
+    depends_on:
+      - user-services
+      - post-services
+      - search-services
+     
+
+  nats:
+    image: nats:2.7-alpine
+    ports:
+      - "4222:4222"
+
+  postgres-user:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: user_db
+    ports:
+      - "5432:5432"
+
+
+  postgres-post:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_USER: post
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: post_db
+    ports:
+      - "5433:5432"
+
+  postgres-search:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_USER: search
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: search_db
+    ports:
+      - "5434:5432"
+
+  user-services:
+    build: ./services/user-services
+    environment:
+      - DATABASE_URL=postgres://avnadmin:AVNS_kYc_wSP26wAlt5gT4FS@hariomop-hariomvirkhare02-01f9.l.aivencloud.com:19233/defaultdb?sslmode=require
+      - JWT_SECRET=!@#$%^&*()_+1234567890
+      - NATS_URL=nats://nats:4222
+    depends_on:
+      - postgres-user
+  
+  post-services:
+    build: ./services/post-services
+    environment:
+      - DATABASE_URL=postgres://avnadmin:AVNS_kYc_wSP26wAlt5gT4FS@hariomop-hariomvirkhare02-01f9.l.aivencloud.com:19233/defaultdb?sslmode=require
+      - NATS_URL=nats://nats:4222
+    depends_on:
+      - postgres-post
+      - nats
+
+  search-services:
+    build: ./services/search-service 
+    environment:
+      - DATABASE_URL=postgres://avnadmin:AVNS_kYc_wSP26wAlt5gT4FS@hariomop-hariomvirkhare02-01f9.l.aivencloud.com:19233/defaultdb?sslmode=require
+      - NATS_URL=nats://nats:4222
+    depends_on:
+      - postgres-search
+      - nats
+  
+  search-service:
+    build: ./services/search-service
+    environment:
+      - DATABASE_URL=postgres://avnadmin:AVNS_kYc_wSP26wAlt5gT4FS@hariomop-hariomvirkhare02-01f9.l.aivencloud.com:19233/defaultdb?sslmode=require
+      - NATS_URL=nats://nats:4222
+    depends_on:
+      - postgres-search
+      - nats
+
+networks:
+  krakend:
+    driver: bridge

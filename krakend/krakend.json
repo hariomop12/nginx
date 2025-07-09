@@ -1,0 +1,55 @@
+{
+  "version": 3,
+  "port": 8000,
+  "endpoints": [
+    {
+      "endpoint": "/users/register",
+      "method": "POST",
+      "backend": [
+        {
+          "url_pattern": "/register",
+          "host": ["http://user-service:8081"]
+        }
+      ]
+    },
+    {
+      "endpoint": "/users/login",
+      "method": "POST",
+      "backend": [
+        {
+          "url_pattern": "/login",
+          "host": ["http://user-service:8081"]
+        }
+      ]
+    },
+    {
+      "endpoint": "/posts",
+      "method": "POST",
+      "extra_config": {
+        "auth/validator": {
+          "alg": "HS256",
+          "jwk_url": "http://user-service:8081/.jwk",
+          "roles": ["user"],
+          "roles_key": "roles"
+        }
+      },
+      "backend": [
+        {
+          "url_pattern": "/posts",
+          "method": "POST",
+          "host": ["http://post-service:8082"]
+        }
+      ]
+    },
+    {
+      "endpoint": "/search",
+      "method": "GET",
+      "backend": [
+        {
+          "url_pattern": "/search",
+          "host": ["http://search-service:8083"]
+        }
+      ]
+    }
+  ]
+}
