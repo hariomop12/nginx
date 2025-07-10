@@ -4,4 +4,4 @@ COPY go.mod ./
 RUN go mod download
 COPY . .
 RUN go build -o /post-service
-CMD [ "/user-service" ]
+CMD [ "/post-service" ]

@@ -2,25 +2,36 @@ package main
 
 import (
 	"context"
-	 
-	"log"
 	"encoding/json"
+	"log"
+	"os"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v4/pgxpool"
-	"github.com/nats-io/nats.go"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/joho/godotenv"
+	"github.com/nats-io/nats.go"
 )
 
 type PostEvent struct {
-	ID      uuid.UUID    `json:"id"`
-	Title   string `json:"title"`
-	Content string `json:"content"`
+	ID      uuid.UUID `json:"id"`
+	Title   string    `json:"title"`
+	Content string    `json:"content"`
 }
 
 func main() {
+	// Load environment variables from .env file for local development
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, using system environment variables")
+	}
+
 	// --- Database connection & Schema setup ---
-	dbpool, err := pgxpool.Connect(context.Background(), "postgres://avnadmin:AVNS_kYc_wSP26wAlt5gT4FS@hariomop-hariomvirkhare02-01f9.l.aivencloud.com:19233/defaultdb?sslmode=require")
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		log.Fatal("DATABASE_URL environment variable is required")
+	}
+
+	dbpool, err := pgxpool.Connect(context.Background(), databaseURL)
 
 	if err != nil {
 		log.Fatalf("Unable to connect to database: %v\n", err)
@@ -30,21 +41,25 @@ func main() {
 	setupSchema(dbpool)
 
 	// --- NATS connection ---
-	nc, err := nats.Connect("nats://nats:4222")
+	natsURL := os.Getenv("NATS_URL")
+	if natsURL == "" {
+		natsURL = "nats://localhost:4222" // Default fallback
+	}
+
+	nc, err := nats.Connect(natsURL)
 	if err != nil {
 		log.Fatalf("Unable to connect to NATS: %v\n", err)
 	}
 	defer nc.Close()
 
 	nc.Subscribe("post.updated", func(msg *nats.Msg) {
-	var post PostEvent
-	if err := json.Unmarshal(msg.Data, &post); err != nil {
-		log.Printf("Invalid message format: %v", err)
-		return
-	}
-	upsertPost(dbpool, post)
-})
-
+		var post PostEvent
+		if err := json.Unmarshal(msg.Data, &post); err != nil {
+			log.Printf("Invalid message format: %v", err)
+			return
+		}
+		upsertPost(dbpool, post)
+	})
 
 	// --- Gin setup ---
 	r := gin.Default()
@@ -76,7 +91,7 @@ func main() {
 		c.JSON(200, gin.H{"post_ids": postIDs})
 	})
 
-	r.Run(":8080")
+	r.Run(":8083")
 }
 
 func setupSchema(dbpool *pgxpool.Pool) {

@@ -13,6 +13,7 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/joho/godotenv"
 	"github.com/lestrrat-go/jwx/jwk"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -20,8 +21,8 @@ import (
 var (
 	dbPool    *pgxpool.Pool
 	rsaKey    *rsa.PrivateKey
-	rsaKeyJWK jwk.Key  
-	jwkKeySet jwk.Set 
+	rsaKeyJWK jwk.Key
+	jwkKeySet jwk.Set
 )
 
 type User struct {
@@ -41,6 +42,11 @@ type loginRequest struct {
 }
 
 func main() {
+	// Load environment variables from .env file for local development
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, using system environment variables")
+	}
+
 	var err error
 
 	databaseUrl := os.Getenv("DATABASE_URL")
@@ -55,15 +61,15 @@ func main() {
 		log.Fatalf("Error generating RSA key: %v\n", err)
 	}
 
-	rsaKeyJWK, err = jwk.New(rsaKey.PublicKey)  
+	rsaKeyJWK, err = jwk.New(rsaKey.PublicKey)
 	if err != nil {
 		log.Fatalf("Error creating JWK from RSA key: %v\n", err)
 	}
 	jwk.AssignKeyID(rsaKeyJWK)
 	rsaKeyJWK.Set("alg", "RS256")
 
-	jwkKeySet = jwk.NewSet()  
-	jwkKeySet.Add(rsaKeyJWK)  
+	jwkKeySet = jwk.NewSet()
+	jwkKeySet.Add(rsaKeyJWK)
 
 	log.Println("RSA key pair for JWT generated.")
 
@@ -151,7 +157,6 @@ func loginHandler(c *gin.Context) {
 func jwkHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, jwkKeySet)
 }
-
 
 func healthCheckHandler(c *gin.Context) {
 	if err := dbPool.Ping(context.Background()); err != nil {

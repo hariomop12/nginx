@@ -18,7 +18,7 @@ services:
     depends_on:
       - user-services
       - post-services
-      - search-services
+      - search-service
      
 
   nats:
@@ -57,34 +57,26 @@ services:
   user-services:
     build: ./services/user-services
     environment:
-      - DATABASE_URL=postgres://avnadmin:AVNS_kYc_wSP26wAlt5gT4FS@hariomop-hariomvirkhare02-01f9.l.aivencloud.com:19233/defaultdb?sslmode=require
+      - DATABASE_URL=postgres://user:password@postgres-user:5432/user_db?sslmode=disable
       - JWT_SECRET=!@#$%^&*()_+1234567890
       - NATS_URL=nats://nats:4222
     depends_on:
       - postgres-user
+      - nats
   
   post-services:
     build: ./services/post-services
     environment:
-      - DATABASE_URL=postgres://avnadmin:AVNS_kYc_wSP26wAlt5gT4FS@hariomop-hariomvirkhare02-01f9.l.aivencloud.com:19233/defaultdb?sslmode=require
+      - DATABASE_URL=postgres://post:password@postgres-post:5432/post_db?sslmode=disable
       - NATS_URL=nats://nats:4222
     depends_on:
       - postgres-post
       - nats
 
-  search-services:
-    build: ./services/search-service 
-    environment:
-      - DATABASE_URL=postgres://avnadmin:AVNS_kYc_wSP26wAlt5gT4FS@hariomop-hariomvirkhare02-01f9.l.aivencloud.com:19233/defaultdb?sslmode=require
-      - NATS_URL=nats://nats:4222
-    depends_on:
-      - postgres-search
-      - nats
-  
   search-service:
     build: ./services/search-service
     environment:
-      - DATABASE_URL=postgres://avnadmin:AVNS_kYc_wSP26wAlt5gT4FS@hariomop-hariomvirkhare02-01f9.l.aivencloud.com:19233/defaultdb?sslmode=require
+      - DATABASE_URL=postgres://search:password@postgres-search:5432/search_db?sslmode=disable
       - NATS_URL=nats://nats:4222
     depends_on:
       - postgres-search

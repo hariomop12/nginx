@@ -1,6 +1,6 @@
 package main
 
-import(
+import (
 	"context"
 	"encoding/json"
 	"log"
@@ -10,35 +10,39 @@ import(
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/joho/godotenv"
 	"github.com/nats-io/nats.go"
-
 )
-
 
 var (
 	dbPool *pgxpool.Pool
-	nc *nats.Conn
+	nc     *nats.Conn
 )
 
-type Post struct{
-	ID uuid.UUID `json:"id"`
-	UserID uuid.UUID `json:"user_id"`
-	Title string `json:"title"`
-	Content string `json:"content"`
+type Post struct {
+	ID      uuid.UUID `json:"id"`
+	UserID  uuid.UUID `json:"user_id"`
+	Title   string    `json:"title"`
+	Content string    `json:"content"`
 }
 
 type CreatePostRequest struct {
-	Title string `json:"title" binding:"required"`
+	Title   string `json:"title" binding:"required"`
 	Content string `json:"content" binding:"required"`
 }
 
-type PostEvent struct{
-	ID string `json:"id"`
-	Title string `json:"title"`
+type PostEvent struct {
+	ID      string `json:"id"`
+	Title   string `json:"title"`
 	Content string `json:"content"`
 }
 
-func main(){
+func main() {
+	// Load environment variables from .env file for local development
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, using system environment variables")
+	}
+
 	var err error
 	// --- DB Connection ---
 	DATABASE_URL := os.Getenv("DATABASE_URL")
@@ -67,19 +71,18 @@ func main(){
 	// --- Gin Router ---
 	r := gin.Default()
 	r.POST("/posts", createPostHandler)
-	r.GET("/posts/:id", getPostByIdHandler)
-	r.GET("/posts", getAllPostsHandler)
+	// r.GET("/posts/:id", getPostByIdHandler)  // TODO: Implement this handler
+	// r.GET("/posts", getAllPostsHandler)     // TODO: Implement this handler
 	r.Run(":8082") // Run on port 8082
 
 }
-
 
 func createPostHandler(c *gin.Context) {
 	var req CreatePostRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(
 			http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
+		return
 	}
 	// KrakenD will pass the JWT claims as headers, prefixed with 'X-Krakend-'
 
@@ -93,7 +96,7 @@ func createPostHandler(c *gin.Context) {
 		ID:      uuid.New(),
 		UserID:  userID,
 		Title:   req.Title,
-		Content: req.Content
+		Content: req.Content,
 	}
 
 	_, err = dbPool.Exec(context.Background(),
@@ -114,10 +117,16 @@ func createPostHandler(c *gin.Context) {
 	}
 
 	eventBytes, err := json.Marshal(event)
-if err != nil {
-    c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to marshal event"})
-    return
-}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to marshal event"})
+		return
+	}
+
+	// Publish to NATS
+	err = nc.Publish("post.updated", eventBytes)
+	if err != nil {
+		log.Printf("Failed to publish event: %v", err)
+	}
 	log.Printf("Post created event published: %v", event)
 	c.JSON(http.StatusCreated, newPost)
 }
